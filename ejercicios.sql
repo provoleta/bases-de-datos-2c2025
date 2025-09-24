@@ -69,15 +69,7 @@ left join Item_Factura on fact_tipo+fact_sucursal+fact_numero = item_tipo+item_s
 group by clie_codigo
 order by 2
 
-/* Escriba una consulta que retorne los pares de productos que hayan sido vendidos juntos
-(en la misma factura) más de 500 veces. El resultado debe mostrar el código y
-descripción de cada uno de los productos y la cantidad de veces que fueron vendidos
-juntos. El resultado debe estar ordenado por la cantidad de veces que se vendieron
-juntos dichos productos. Los distintos pares no deben retornarse más de una vez.
-Ejemplo de lo que retornaría la consulta:
-PROD1 DETALLE1 PROD2 DETALLE2 VECES
-1731 MARLBORO KS 1 7 1 8 P H ILIPS MORRIS KS 5 0 7
-1718 PHILIPS MORRIS KS 1 7 0 5 P H I L I P S MORRIS BOX 10 5 6 2 */
+/* EJ15 REHACER */
 
 select I1.item_producto, 
 	(select prod_detalle from Producto where prod_codigo = I1.item_producto), 
@@ -100,15 +92,7 @@ where p1.prod_codigo < p2.prod_codigo
 group by p1.prod_codigo, p1.prod_detalle, p2.prod_codigo, p2.prod_Detalle 
 having count(*) > 500
 
-/* Con el fin de lanzar una nueva campaña comercial para los clientes que menos compran
-en la empresa, se pide una consulta SQL que retorne aquellos clientes cuyas compras
-son inferiores a 1/3 del monto de ventas del producto que más se vendió en el 2012.
-Además mostrar
-1. Nombre del Cliente
-2. Cantidad de unidades totales vendidas en el 2012 para ese cliente.
-3. Código de producto que mayor venta tuvo en el 2012 (en caso de existir más de 1,
-mostrar solamente el de menor código) para ese cliente.
-*/
+/* EJ16 */
 select clie_codigo,
 	clie_razon_social,
 	sum(item_cantidad),
@@ -132,32 +116,20 @@ having sum(fact_total) < (
 )
 
 
-/*
-Escriba una consulta que retorne una estadística de ventas por año y mes para cada
-producto.
-La consulta debe retornar:
-PERIODO: Año y mes de la estadística con el formato YYYYMM
-PROD: Código de producto
-DETALLE: Detalle del producto
-CANTIDAD_VENDIDA= Cantidad vendida del producto en el periodo
-VENTAS_AÑO_ANT= Cantidad vendida del producto en el mismo mes del periodo
-pero del año anterior
-CANT_FACTURAS= Cantidad de facturas en las que se vendió el producto en el
-periodo
-La consulta no puede mostrar NUL
-*/
-select str(year(fact_fecha), 4) + str(month(fact_fecha), 2) periodo, 
+/* EJ17 */
+select str(year(f1.fact_fecha), 4) + str(month(f1.fact_fecha), 2) periodo,
 	prod_codigo,
-	sum(item_cantidad),
-	(select sum(i2.item_cantidad) from Item_Factura i2
+	sum(item_cantidad) cantidad_vendida,
+	isnull((
+		select sum(i2.item_cantidad)
+		from Item_Factura i2
 		join Factura f2 on i2.item_tipo+i2.item_sucursal+i2.item_numero=f2.fact_tipo+f2.fact_sucursal+f2.fact_numero
-		where i2.item_producto = '00010200' and year(f2.fact_fecha) = 2011 and month(f2.fact_fecha) = month(fact_fecha)
-		)
-from producto 
-left join Item_Factura on item_producto = prod_codigo
-left join Factura on item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
-where prod_codigo = '00010200'
-group by year(fact_fecha), MONTH(fact_fecha), prod_codigo
+		where i2.item_producto = prod_codigo and year(f2.fact_fecha) =  year(f1.fact_fecha) - 1 and month(f2.fact_fecha) = month(f1.fact_fecha)
+	), 0) periodo_anterior,
+	count(fact_numero) cantidad_facturas
+from producto
+join Item_Factura on item_producto = prod_codigo
+join Factura f1 on item_tipo+item_sucursal+item_numero=f1.fact_tipo+f1.fact_sucursal+f1.fact_numero
+group by year(f1.fact_fecha), month(f1.fact_fecha), prod_codigo
 
 
-select * from factura
