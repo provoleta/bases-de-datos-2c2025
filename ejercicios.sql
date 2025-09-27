@@ -132,4 +132,49 @@ join Item_Factura on item_producto = prod_codigo
 join Factura f1 on item_tipo+item_sucursal+item_numero=f1.fact_tipo+f1.fact_sucursal+f1.fact_numero
 group by year(f1.fact_fecha), month(f1.fact_fecha), prod_codigo
 
+/*
+18. Escriba una consulta que retorne una estadística de ventas para todos los rubros.
+La consulta debe retornar:
+DETALLE_RUBRO: Detalle del rubro
+VENTAS: Suma de las ventas en pesos de productos vendidos de dicho rubro
+PROD1: Código del producto más vendido de dicho rubro
+PROD2: Código del segundo producto más vendido de dicho rubro
+CLIENTE: Código del cliente que compro más productos del rubro en los últimos 30
+días
+La consulta no puede mostrar NULL en ninguna de sus col
+*/
+select rubr_id, 
+    sum(item_cantidad * item_precio),
+    (
+        select top 1 item_producto from Item_Factura
+        join Producto p1 on item_producto = p1.prod_codigo
+        where p1.prod_rubro = rubr_id
+        group by item_producto
+        order by sum(item_cantidad) desc
+    ) primero_mas_vendido,
+    (
+        select top 1 item_producto from Item_Factura
+        where item_producto in 
+            (select top 2 item_producto from Item_Factura
+            join Producto p2 on item_producto = p2.prod_codigo
+            where p2.prod_rubro = rubr_id  
+            group by item_producto
+            order by sum(item_cantidad) desc)
+        group by item_producto
+        order by sum(item_cantidad) asc
+    ) segundo_mas_vendido,
+    (
+        select top 1 clie_codigo
+        from Cliente
+        join Factura on fact_cliente = clie_codigo
+        join Item_Factura on fact_sucursal+fact_numero+fact_tipo=item_sucursal+item_numero+item_tipo
+        join Producto on item_producto = prod_codigo
+        where prod_rubro = rubr_id
+        group by clie_codigo
+        order by sum(item_cantidad)
+    ) cliente_mas_compro
+from Rubro
+join Producto on prod_rubro = rubr_id
+join Item_Factura on item_producto = prod_codigo
+group by rubr_id
 
