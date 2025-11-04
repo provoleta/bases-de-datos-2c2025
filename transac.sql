@@ -130,3 +130,115 @@ producto de mayor nivel), en cuyo caso deberá reemplazar las filas
 correspondientes a dichos productos por una sola fila con el producto que
 componen con la cantidad de dicho producto que corresponda*/
 /* BLA BLA BLE MAXIMUS */
+/* perdi muchos ejercicios */
+
+/* EJ16 */
+create trigger ej16 on Item_Factura after insert
+as 
+begin
+	declare @producto char(8), @cantidad int
+	declare c1 cursor for select item_producto, item_cantidad from inserted
+	open c1
+	fetch c1 into @producto, @cantidad
+	while @@FETCH_STATUS = 0
+	begin
+		exec restarStock @producto, @cantidad
+		fetch c1 into @producto, @cantidad
+	end
+	close c1
+	deallocate c1
+end
+go
+
+create or alter proc restarStock (@producto char(8), @cantidad int)
+as
+begin
+	declare @cantidadStock int, @deposito char(2) , @ultimoDeposito char(2)
+	declare c1 cursor for select stoc_cantidad, stoc_deposito from STOCK where stoc_producto = @producto order by stoc_cantidad desc
+	open c1
+	fetch c1 into @cantidadStock, @deposito
+	while @producto > 0 and @@FETCH_STATUS = 0
+	begin
+		if @cantidadStock > @cantidad
+		begin
+			update STOCK set stoc_cantidad = stoc_cantidad - @cantidad 
+			select * from STOCK where stoc_deposito = @deposito and stoc_producto = @producto
+		end
+		else
+			update STOCK set stoc_cantidad = 0
+			select * from STOCK where stoc_deposito = @deposito and stoc_producto = @producto
+			select @cantidad = @cantidad - @cantidadStock
+		select @ultimoDeposito = @deposito
+		fetch c1 into @cantidadStock, @deposito
+	end
+	if @cantidad > 0
+	update STOCK set stoc_cantidad = stoc_cantidad - @cantidad 
+			select * from STOCK where stoc_deposito = @ultimoDeposito and stoc_producto = @producto
+	close c1
+	deallocate c1
+end
+go
+
+/* EJ17 */ -- tmb se podria con instead of, pero es mucho mas largo (si tuviera que ver 1 por 1, si o si asi)
+create trigger ej17 on STOCK after update, insert
+as
+begin
+	if (exists(select * from inserted where stoc_cantidad < stoc_punto_reposicion or stoc_cantidad > stoc_stock_maximo))
+		rollback
+end
+go
+
+/* EJ18 */
+create trigger ej18 on factura for insert
+as 
+begin
+	if exists(select * from inserted i
+				join Cliente on i.fact_cliente = clie_codigo
+				where clie_limite_credito < i.fact_total+(select sum(fact_total) 
+														from Factura f 
+														where f.fact_cliente = clie_codigo 
+															and MONTH(f.fact_fecha) = MONTH(i.fact_fecha)) + 
+														(select sum(fact_total) 
+														from Inserted f 
+														where f.fact_cliente = clie_codigo and f.fact_numero <> i.fact_numero
+															and MONTH(f.fact_fecha) = MONTH(i.fact_fecha)))
+		print('Alguno no cumple la regla')
+		rollback
+end
+go
+
+/* EJ19 */
+create trigger ej19 on Empleado after insert, update, delete
+as
+begin
+	if exists(select * from Empleado 
+			where empl_codigo in (select empl_jefe from Empleado) and year(CURRENT_DATE) - year(empl_ingreso) < 5)
+		rollback
+
+
+end
+go
+
+create function cantSubordinados(@empleado int)
+returns int
+as
+begin
+	declare @cantidad int
+	select @cantidad = count(*) from Empleado where empl_jefe = @empleado
+	
+end
+go
+
+create trigger prueba1 on Empleado for insert
+as
+begin
+	declare @cant int
+	select @cant = (select count(*) from Empleado)
+	print(@cant)
+
+end
+go
+
+insert into Empleado (empl_codigo) 
+values
+(123.0)
