@@ -242,3 +242,96 @@ go
 insert into Empleado (empl_codigo) 
 values
 (123.0)
+go
+/*
+25. Desarrolle el/los elementos de base de datos necesarios para que no se permita
+que la composición de los productos sea recursiva, o sea, que si el producto A
+compone al producto B, dicho producto B no pueda ser compuesto por el
+producto A, hoy la regla se cumple.
+*/
+create trigger ej25 on Composicion for insert, update
+as
+begin
+	declare @producto char(8), @componente char(8)
+	declare c1 cursor for select comp_producto, comp_componente from inserted
+	open c1
+	fetch next into @producto
+	while @@FETCH_STATUS = 0
+	begin
+		if exists(
+			select * from Composicion
+			where comp_componente = @producto and comp_producto = @componente
+			)
+			rollback
+		fetch next into @producto
+	end
+	close c1
+	deallocate c1
+end
+go
+
+create or alter trigger pruebaCantidad on Rubro For insert
+as
+begin
+	declare @cant int
+	select @cant = count(*) from Rubro
+	print(@cant)
+	rollback
+end
+go
+insert into rubro values (9898, 'PIES') 
+select * from Rubro
+go
+/*
+27. Se requiere reasignar los encargados de stock de los diferentes depósitos. Para
+ello se solicita que realice el o los objetos de base de datos necesarios para
+asignar a cada uno de los depósitos el encargado que le corresponda,
+entendiendo que el encargado que le corresponde es cualquier empleado que no
+es jefe y que no es vendedor, o sea, que no está asignado a ningun cliente, se
+deberán ir asignando tratando de que un empleado solo tenga un deposito
+asignado, en caso de no poder se irán aumentando la cantidad de depósitos
+progresivamente para cada empleado.
+*/
+create proc ej27 
+as
+begin
+	declare @deposito char(2)
+	declare c1 cursor for select depo_codigo from DEPOSITO
+	open c1
+	fetch next into @deposito
+	while @@FETCH_STATUS = 0
+	begin
+		exec dbo.reasignarEncargado @deposito
+	end
+	close c1
+	deallocate c1
+end
+go
+
+create proc reasignarEncargado (@deposito char(2))
+as
+begin
+	declare @nuevoEncargado numeric(6)
+	select top 1 @nuevoEncargado = empl_codigo from Empleado
+	left join DEPOSITO on depo_encargado = empl_codigo
+	where 
+		empl_codigo not in (
+			select j.empl_codigo from Empleado j
+			join Empleado e on e.empl_jefe = j.empl_codigo
+		) and 
+		empl_codigo not in (
+			select empl_codigo from Empleado
+			join Cliente on clie_vendedor = empl_codigo
+		)
+	group by empl_codigo
+	order by count(*)
+
+	if @nuevoEncargado is not null
+	begin
+		update DEPOSITO set depo_encargado = @nuevoEncargado
+		where depo_codigo = @deposito
+	end
+
+end
+go
+
